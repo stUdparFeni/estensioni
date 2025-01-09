@@ -61,48 +61,17 @@
         </form>
 
         <?php
+        // Connessione al database SQLite
+        $db = new SQLite3('calcolatrice.db');
 
-include 'config.php';
-
-if ($_SERVER['REQUEST_METHOD'] == 'POST') {
-    $numero1 = $_POST['numero1'];
-    $numero2 = $_POST['numero2'];
-    $operazione = $_POST['operazione'];
-    $risultato = '';
-
-    switch ($operazione) {
-        case 'somma':
-            $risultato = $numero1 + $numero2;
-            break;
-        case 'sottrazione':
-            $risultato = $numero1 - $numero2;
-            break;
-        case 'moltiplicazione':
-            $risultato = $numero1 * $numero2;
-            break;
-        case 'divisione':
-            if ($numero2 != 0) {
-                $risultato = $numero1 / $numero2;
-            } else {
-                $risultato = 'Errore: Divisione per zero!';
-            }
-            break;
-        default:
-            $risultato = 'Operazione non valida.';
-            break;
-    }
-
-    // Salva i calcoli nel database
-    $stmt = $conn->prepare("INSERT INTO calcoli (numero1, numero2, operazione, risultato) VALUES (?, ?, ?, ?)");
-    $stmt->bind_param("ddss", $numero1, $numero2, $operazione, $risultato);
-    $stmt->execute();
-    $stmt->close();
-
-    echo "<div class='result'>Risultato: $risultato</div>";
-}
-
-$conn->close();
-
+        // Creazione della tabella se non esiste
+        $db->exec("CREATE TABLE IF NOT EXISTS calcoli (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            numero1 REAL,
+            numero2 REAL,
+            operazione TEXT,
+            risultato TEXT
+        )");
 
         if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             $numero1 = $_POST['numero1'];
@@ -110,6 +79,7 @@ $conn->close();
             $operazione = $_POST['operazione'];
             $risultato = '';
 
+            // Calcolo
             switch ($operazione) {
                 case 'somma':
                     $risultato = $numero1 + $numero2;
@@ -132,8 +102,24 @@ $conn->close();
                     break;
             }
 
+            // Salvataggio nel database
+            $stmt = $db->prepare("INSERT INTO calcoli (numero1, numero2, operazione, risultato) VALUES (:numero1, :numero2, :operazione, :risultato)");
+            $stmt->bindValue(':numero1', $numero1, SQLITE3_FLOAT);
+            $stmt->bindValue(':numero2', $numero2, SQLITE3_FLOAT);
+            $stmt->bindValue(':operazione', $operazione, SQLITE3_TEXT);
+            $stmt->bindValue(':risultato', $risultato, SQLITE3_TEXT);
+            $stmt->execute();
+
             echo "<div class='result'>Risultato: $risultato</div>";
         }
+
+        // Mostra lo storico dei calcoli
+        $result = $db->query("SELECT * FROM calcoli ORDER BY id DESC LIMIT 10");
+        echo "<h2>Storico Calcoli</h2><ul>";
+        while ($row = $result->fetchArray(SQLITE3_ASSOC)) {
+            echo "<li>{$row['numero1']} {$row['operazione']} {$row['numero2']} = {$row['risultato']}</li>";
+        }
+        echo "</ul>";
         ?>
     </div>
 </body>
